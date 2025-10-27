@@ -50,7 +50,7 @@
       margin:0; padding:0; font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, 'Apple Color Emoji','Segoe UI Emoji';
       background: linear-gradient(180deg, #0f172a 0%, #111827 100%);
       color:#0f172a;
-      overflow-x: hidden; /* evita overlay horizontal */
+      overflow-x: hidden;
     }
     img, svg{ max-width:100%; height:auto; }
 
@@ -267,13 +267,16 @@
 
       <div class="actions">
         <button class="btn btn-primary" id="calcBtn">Calcular resultado</button>
-        <button class="btn btn-success" id="shareBtn">Enviar via WhatsApp</button>
         <button class="btn btn-danger" id="resetBtn">Limpar respostas</button>
       </div>
 
       <div class="results" id="results" hidden>
         <h4>Resultados por Dimensão</h4>
         <div class="res-grid" id="resGrid"></div>
+        <!-- Botão de WhatsApp ao final da correção (centralizado/simétrico) -->
+        <div class="actions">
+          <button class="btn btn-success" id="shareBtn">Enviar resultado ao psicólogo via WhatsApp</button>
+        </div>
       </div>
     </div>
   </div>
@@ -344,9 +347,7 @@
 
     // Destaca não respondidas
     function highlightMissing(missingNames){
-      // limpar
       document.querySelectorAll('.item').forEach(it=> it.classList.remove('missing'));
-      // aplicar
       missingNames.forEach(name=>{
         const holder = document.querySelector(`.likert[data-q="${name}"]`);
         if(holder){ holder.closest('.item').classList.add('missing'); }
@@ -499,21 +500,34 @@
       document.getElementById('results').hidden = false;
     }
 
+    // Mensagem de WhatsApp com significado clínico (qualitativo + quantitativo)
     function buildWhatsAppMessage(){
       const name = document.getElementById('name').value || '(sem nome)';
       const age = document.getElementById('age').value || '-';
       const date = document.getElementById('date').value || new Date().toLocaleDateString('pt-BR');
-      const dimEls = document.querySelectorAll('#resGrid .res-card');
+      const resCards = document.querySelectorAll('#resGrid .res-card');
 
       const lines = [];
       lines.push(`ICAPS – Resultado (0–100)`);
       lines.push(`Nome: ${name} | Idade: ${age} | Data: ${date}`);
-      DIMENSIONS.forEach((d, idx)=>{
-        const card = dimEls[idx];
-        if(!card) return;
-        const sc = card.querySelector('.res-score').textContent;
-        lines.push(`${d.title}: ${sc}`);
+      lines.push(`--------------------------------------------------`);
+
+      resCards.forEach((card, idx)=>{
+        const title = DIMENSIONS[idx].title;
+        const scoreLine = card.querySelector('.res-score')?.textContent || '';
+        const text = card.querySelector('.res-text')?.textContent || '';
+        // Extra: separar a faixa/zona do scoreLine para clareza
+        // Ex.: "Saúde relacional: 72/100 · Zona de Transição · 10/10 respondidas"
+        const parts = scoreLine.split('·').map(s => s.trim());
+        const scorePart = parts[0] || '';
+        const zonePart = parts[1] || '';
+        lines.push(`• ${title}`);
+        if(scorePart) lines.push(`  - ${scorePart}`);
+        if(zonePart)  lines.push(`  - ${zonePart}`);
+        if(text)      lines.push(`  - Significado clínico: ${text}`);
+        lines.push('');
       });
+
       lines.push('— Enviado automaticamente');
       return encodeURIComponent(lines.join('\n'));
     }
@@ -530,21 +544,17 @@
       }
       highlightMissing([]); // limpa
       renderResults();
-      window.scrollTo({ top: document.body.scrollHeight, behavior:'smooth' });
+      document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
     });
 
     document.getElementById('shareBtn').addEventListener('click', ()=>{
-      const missing = findAllMissing();
-      if(missing.length){
-        highlightMissing(missing);
-        const first = document.querySelector(`.likert[data-q="${missing[0]}"]`);
-        if(first) first.closest('.item').scrollIntoView({behavior:'smooth', block:'center'});
-        alert('Responda todas as perguntas antes de compartilhar no WhatsApp.');
+      // Só permite enviar se resultados visíveis
+      if(document.getElementById('results').hidden){
+        alert('Calcule o resultado antes de enviar.');
         return;
       }
-      if(document.getElementById('results').hidden) renderResults();
       const msg = buildWhatsAppMessage();
-      const phone = '5535984647323';
+      const phone = '5535984647323'; // psicólogo
       const url = `https://wa.me/${phone}?text=${msg}`;
       window.open(url, '_blank');
     });
@@ -559,3 +569,4 @@
   </script>
 </body>
 </html>
+
